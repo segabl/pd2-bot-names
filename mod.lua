@@ -104,7 +104,7 @@ end
 
 if RequiredScript == "lib/network/base/basenetworksession" then
 
-	Hooks:PreHook(BaseNetworkSession, "_on_peer_removed", "_on_peer_removed_bot_names", function (peer)
+	Hooks:PreHook(BaseNetworkSession, "_on_peer_removed", "_on_peer_removed_bot_names", function (self, peer)
 		BotNames.nick_names[peer:character()] = peer:name()
 	end)
 
