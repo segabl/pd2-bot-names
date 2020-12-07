@@ -7,11 +7,12 @@ if not BotNames then
 	}
 	BotNames.members = {}
 	BotNames.names = {}
+	BotNames.host_names = {}
 	BotNames.nick_names = {}
 	BotNames.name_index = 1
 	BotNames.menu_builder = MenuBuilder:new("bot_names", BotNames.settings)
 
-	function BotNames:fetch_group_member_names()
+	function BotNames:fetch_random_names()
 
 		local url = "https://steamcommunity.com/" .. (tonumber(self.settings.group) and "gid/" or "groups/") .. self.settings.group .. "/memberslistxml/?xml=1"
 		local file = io.open(SavePath .. "bot_names_" .. self.settings.group .. ".txt", "r")
@@ -21,7 +22,8 @@ if not BotNames then
 		end
 
 		local function fetch_names()
-			for _ = 1, tweak_data.max_players - 1 do
+			local num_names = math.min(tweak_data.max_players - 1, #self.members)
+			for _ = 1, num_names do
 				local index = math.random(#self.members)
 				local member = self.members[index]
 				table.remove(self.members, index)
@@ -29,6 +31,9 @@ if not BotNames then
 					local name = data:match("<steamID><!%[CDATA%[(.+)%]%]></steamID>")
 					if name then
 						table.insert(self.names, name)
+						if #self.names >= num_names and Network:is_server() then
+							LuaNetworking:SendToPeers("bot_names", json.encode(self.names))
+						end
 					end
 				end)
 			end
@@ -61,31 +66,46 @@ if not BotNames then
 
 	end
 
-	BotNames:fetch_group_member_names()
+	function BotNames:get_name()
+		local name = BotNames.host_names[BotNames.name_index] or BotNames.names[BotNames.name_index]
+		BotNames.name_index = BotNames.name_index + 1
+		return name
+	end
+
+	Hooks:Add("LocalizationManagerPostInit", "LocalizationManagerPostInitBotNames", function (loc)
+		HopLib:load_localization(BotNames.mod_path .. "loc/", loc)
+	end)
+
+	Hooks:Add("MenuManagerBuildCustomMenus", "MenuManagerBuildCustomMenusBotNames", function(menu_manager, nodes)
+		BotNames.menu_builder:create_menu(nodes)
+	end)
+
+	Hooks:Add("NetworkReceivedData", "NetworkReceivedDataBotNames", function(sender, id, data)
+		if sender == 1 and id == "bot_names" then
+			BotNames.host_names = json.decode(data)
+		end
+	end)
 
 end
 
 if RequiredScript == "lib/units/player_team/teamaibase" then
 
+	BotNames:fetch_random_names()
+
 	local nick_name_original = TeamAIBase.nick_name
-	function TeamAIBase:nick_name()
+	function TeamAIBase:nick_name(...)
 		if not BotNames.nick_names[self._tweak_table] then
-			BotNames.nick_names[self._tweak_table] = BotNames.names[BotNames.name_index] or nick_name_original(self)
-			BotNames.name_index = BotNames.name_index + 1
+			BotNames.nick_names[self._tweak_table] = BotNames:get_name() or nick_name_original(self, ...)
 		end
 		return BotNames.nick_names[self._tweak_table]
 	end
 
 end
 
-if RequiredScript == "lib/managers/menumanager" then
+if RequiredScript == "lib/network/base/basenetworksession" then
 
-	Hooks:Add("LocalizationManagerPostInit", "LocalizationManagerPostInitStreamlinedHeisting", function (loc)
-		HopLib:load_localization(BotNames.mod_path .. "loc/", loc)
-	end)
-
-	Hooks:Add("MenuManagerBuildCustomMenus", "MenuManagerBuildCustomMenusBotNames", function(menu_manager, nodes)
-		BotNames.menu_builder:create_menu(nodes)
+	Hooks:PreHook(BaseNetworkSession, "_on_peer_removed", "_on_peer_removed_bot_names", function (peer)
+		BotNames.nick_names[peer:character()] = peer:name()
 	end)
 
 end

@@ -14,7 +14,8 @@
 		}
 	],
 	"hooks" : [
-		{ "hook_id" : "lib/managers/menumanager", "script_path" : "mod.lua" }
+		{ "hook_id" : "lib/managers/menumanager", "script_path" : "mod.lua" },
+		{ "hook_id" : "lib/network/base/basenetworksession", "script_path" : "mod.lua" },
 		{ "hook_id" : "lib/units/player_team/teamaibase", "script_path" : "mod.lua" }
 	]
 }
