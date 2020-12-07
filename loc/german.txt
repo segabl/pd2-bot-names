@@ -1,0 +1,6 @@
+{
+	"menu_bot_names" : "Bot Namen",
+	"menu_bot_names_desc" : "Konfiguriere die Optionen für Bot Namen",
+	"menu_bot_names_group" : "Steam Gruppe",
+	"menu_bot_names_group_desc" : "Steam Gruppe von der die zufälligen Bot Namen gewählt werden\nGruppenname oder ID wie in der Adressleiste zu sehen"
+}

@@ -1,0 +1,6 @@
+{
+	"menu_bot_names" : "Bot Names",
+	"menu_bot_names_desc" : "Configure Bot Names options",
+	"menu_bot_names_group" : "Steam Group",
+	"menu_bot_names_group_desc" : "Steam group to pick the random bot names from\nGroup name or ID as shown in the browser address bar"
+}
