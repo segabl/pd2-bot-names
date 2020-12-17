@@ -3,31 +3,43 @@ if not BotNames then
 	BotNames = {}
 	BotNames.mod_path = ModPath
 	BotNames.settings = {
+		source = 1,
 		group = "modworkshop"
 	}
-	BotNames.members = {}
+	BotNames.params = {
+		source = { priority = 2, items = { "menu_bot_names_group", "menu_bot_names_friends" } },
+		group = { priority = 1, callback = function ()
+			if io.file_is_readable(SavePath .. "bot_names_cache.txt") then
+				os.remove(SavePath .. "bot_names_cache.txt")
+			end
+		end }
+	}
 	BotNames.names = {}
 	BotNames.host_names = {}
 	BotNames.nick_names = {}
 	BotNames.name_index = 1
-	BotNames.menu_builder = MenuBuilder:new("bot_names", BotNames.settings)
+	BotNames.menu_builder = MenuBuilder:new("bot_names", BotNames.settings, BotNames.params)
 
-	function BotNames:fetch_random_names()
+	function BotNames:fetch_group_names()
 
+		local members = {}
 		local url = "https://steamcommunity.com/" .. (tonumber(self.settings.group) and "gid/" or "groups/") .. self.settings.group .. "/memberslistxml/?xml=1"
-		local file = io.open(SavePath .. "bot_names_" .. self.settings.group .. ".txt", "r")
+		local file = io.open(SavePath .. "bot_names_cache.txt", "r")
 		if file then
-			self.members = json.decode(file:read("*all"))
+			members = json.decode(file:read("*all"))
 			file:close()
 		end
 
-		local function fetch_names()
-			local num_names = math.min(tweak_data.max_players - 1, #self.members)
+		local function fetch_member_names()
+			local num_names = math.min(tweak_data.max_players - 1, #members)
 			for _ = 1, num_names do
-				local index = math.random(#self.members)
-				local member = self.members[index]
-				table.remove(self.members, index)
-				dohttpreq("https://steamcommunity.com/profiles/" .. member .. "/?xml=1", function (data)
+				local index = math.random(#members)
+				local member = members[index]
+				table.remove(members, index)
+				Steam:http_request("https://steamcommunity.com/profiles/" .. member .. "/?xml=1", function (success, data)
+					if not success then
+						return
+					end
 					local name = data:match("<steamID><!%[CDATA%[(.+)%]%]></steamID>")
 					if name then
 						table.insert(self.names, name)
@@ -40,17 +52,20 @@ if not BotNames then
 		end
 
 		local function fetch_members()
-			dohttpreq(url, function (data)
+			Steam:http_request(url, function (success, data)
+				if not success then
+					return
+				end
 				for id in data:gmatch("<steamID64>([0-9]+)</steamID64>") do
-					table.insert(self.members, id)
+					table.insert(members, id)
 				end
 				url = data:match("<nextPageLink><!%[CDATA%[(.+)%]%]></nextPageLink>")
 				if url then
 					fetch_members()
 				else
-					file = io.open(SavePath .. "bot_names_" .. self.settings.group .. ".txt", "w+")
+					file = io.open(SavePath .. "bot_names_cache.txt", "w+")
 					if file then
-						file:write(json.encode(self.members))
+						file:write(json.encode(members))
 						file:close()
 					end
 					fetch_names()
@@ -58,12 +73,42 @@ if not BotNames then
 			end)
 		end
 
-		if #self.members == 0 then
+		if #members == 0 then
 			fetch_members()
 		else
-			fetch_names()
+			fetch_member_names()
 		end
 
+	end
+
+	function BotNames:fetch_friend_names()
+
+		local friends = {}
+		for _, v in pairs(Steam:friends()) do
+			table.insert(friends, v:name())
+		end
+		local num_names = math.min(tweak_data.max_players - 1, #friends)
+		for _ = 1, num_names do
+			local index = math.random(#friends)
+			local friend = friends[index]
+			table.remove(friends, index)
+			table.insert(self.names, friend)
+		end
+		if Network:is_server() then
+			DelayedCalls:Add("send_bot_names", 2, function ()
+				LuaNetworking:SendToPeers("bot_names", json.encode(self.names))
+			end)
+		end
+
+	end
+
+	function BotNames:fetch_names()
+		self.names = {}
+		if self.settings.source == 1 then
+			self:fetch_group_names()
+		else
+			self:fetch_friend_names()
+		end
 	end
 
 	function BotNames:get_name()
@@ -90,7 +135,7 @@ end
 
 if RequiredScript == "lib/units/player_team/teamaibase" then
 
-	BotNames:fetch_random_names()
+	BotNames:fetch_names()
 
 	local nick_name_original = TeamAIBase.nick_name
 	function TeamAIBase:nick_name(...)
