@@ -9,9 +9,7 @@ if not BotNames then
 	BotNames.params = {
 		source = { priority = 2, items = { "menu_bot_names_group", "menu_bot_names_friends" } },
 		group = { priority = 1, callback = function ()
-			if io.file_is_readable(SavePath .. "bot_names_cache.txt") then
-				os.remove(SavePath .. "bot_names_cache.txt")
-			end
+			os.remove(SavePath .. "bot_names_cache.txt")
 		end }
 	}
 	BotNames.names = {}
