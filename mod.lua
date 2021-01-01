@@ -29,7 +29,7 @@ if not BotNames then
 		end
 
 		local function fetch_member_names()
-			local num_names = math.min(tweak_data.max_players - 1, #members)
+			local num_names = math.min(BigLobbyGlobals and BigLobbyGlobals.num_bot_slots and BigLobbyGlobals:num_bot_slots() or tweak_data.max_players - 1, #members)
 			for _ = 1, num_names do
 				local index = math.random(#members)
 				local member = members[index]
@@ -85,7 +85,7 @@ if not BotNames then
 		for _, v in pairs(Steam:friends()) do
 			table.insert(friends, v:name())
 		end
-		local num_names = math.min(tweak_data.max_players - 1, #friends)
+		local num_names = math.min(BigLobbyGlobals and BigLobbyGlobals.num_bot_slots and BigLobbyGlobals:num_bot_slots() or tweak_data.max_players - 1, #friends)
 		for _ = 1, num_names do
 			local index = math.random(#friends)
 			local friend = friends[index]
