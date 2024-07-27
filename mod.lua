@@ -8,9 +8,7 @@ if not BotNames then
 	}
 	BotNames.params = {
 		source = { priority = 2, items = { "menu_bot_names_group", "menu_bot_names_friends" } },
-		group = { priority = 1, callback = function ()
-			os.remove(SavePath .. "bot_names_cache.txt")
-		end }
+		group = { priority = 1, callback = function () os.remove(SavePath .. "bot_names_cache.txt") end }
 	}
 	BotNames.names = {}
 	BotNames.host_names = {}
@@ -20,13 +18,8 @@ if not BotNames then
 
 	function BotNames:fetch_group_names()
 
-		local members = {}
 		local url = "https://steamcommunity.com/" .. (tonumber(self.settings.group) and "gid/" or "groups/") .. self.settings.group .. "/memberslistxml/?xml=1"
-		local file = io.open(SavePath .. "bot_names_cache.txt", "r")
-		if file then
-			members = json.decode(file:read("*all"))
-			file:close()
-		end
+		local members = io.file_is_readable(SavePath .. "bot_names_cache.txt") and io.load_as_json(SavePath .. "bot_names_cache.txt") or {}
 
 		local function fetch_member_names()
 			local num_names = math.min(BigLobbyGlobals and BigLobbyGlobals.num_bot_slots and BigLobbyGlobals:num_bot_slots() or tweak_data.max_players - 1, #members)
@@ -34,8 +27,8 @@ if not BotNames then
 				local index = math.random(#members)
 				local member = members[index]
 				table.remove(members, index)
-				Steam:http_request("https://steamcommunity.com/profiles/" .. member .. "/?xml=1", function (success, data)
-					if not success then
+				dohttpreq("https://steamcommunity.com/profiles/" .. member .. "/?xml=1", function (data, _, request_info)
+					if not request_info.querySucceeded then
 						return
 					end
 					local name = data:match("<steamID><!%[CDATA%[(.+)%]%]></steamID>")
@@ -50,8 +43,8 @@ if not BotNames then
 		end
 
 		local function fetch_members()
-			Steam:http_request(url, function (success, data)
-				if not success then
+			dohttpreq(url, function (data, _, request_info)
+				if not request_info.querySucceeded then
 					return
 				end
 				for id in data:gmatch("<steamID64>([0-9]+)</steamID64>") do
@@ -61,12 +54,8 @@ if not BotNames then
 				if url then
 					fetch_members()
 				else
-					file = io.open(SavePath .. "bot_names_cache.txt", "w+")
-					if file then
-						file:write(json.encode(members))
-						file:close()
-					end
-					fetch_names()
+					io.save_as_json(members, SavePath .. "bot_names_cache.txt")
+					fetch_member_names()
 				end
 			end)
 		end
@@ -81,6 +70,9 @@ if not BotNames then
 
 	function BotNames:fetch_friend_names()
 
+		if not Steam then
+			return
+		end
 		local friends = {}
 		for _, v in pairs(Steam:friends()) do
 			table.insert(friends, v:name())
