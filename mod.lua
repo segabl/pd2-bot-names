@@ -8,7 +8,7 @@ if not BotNames then
 	}
 	BotNames.params = {
 		source = { priority = 2, items = { "menu_bot_names_group", "menu_bot_names_friends" } },
-		group = { priority = 1, callback = function () os.remove(SavePath .. "bot_names_cache.txt") end }
+		group = { priority = 1, callback = function() os.remove(SavePath .. "bot_names_cache.txt") end }
 	}
 	BotNames.names = {}
 	BotNames.host_names = {}
@@ -16,18 +16,22 @@ if not BotNames then
 	BotNames.name_index = 1
 	BotNames.menu_builder = MenuBuilder:new("bot_names", BotNames.settings, BotNames.params)
 
+	function BotNames:get_num_bots()
+		return math.max(3, BigLobbyGlobals and BigLobbyGlobals.num_bots_settings or #tweak_data.peer_vector_colors - 2)
+	end
+
 	function BotNames:fetch_group_names()
 
 		local url = "https://steamcommunity.com/" .. (tonumber(self.settings.group) and "gid/" or "groups/") .. self.settings.group .. "/memberslistxml/?xml=1"
 		local members = io.file_is_readable(SavePath .. "bot_names_cache.txt") and io.load_as_json(SavePath .. "bot_names_cache.txt") or {}
 
 		local function fetch_member_names()
-			local num_names = math.min(BigLobbyGlobals and BigLobbyGlobals.num_bot_slots and BigLobbyGlobals:num_bot_slots() or tweak_data.max_players - 1, #members)
+			local num_names = math.min(BotNames:get_num_bots(), #members)
 			for _ = 1, num_names do
 				local index = math.random(#members)
 				local member = members[index]
 				table.remove(members, index)
-				dohttpreq("https://steamcommunity.com/profiles/" .. member .. "/?xml=1", function (data, _, request_info)
+				dohttpreq("https://steamcommunity.com/profiles/" .. member .. "/?xml=1", function(data, _, request_info)
 					if not request_info.querySucceeded then
 						return
 					end
@@ -43,7 +47,7 @@ if not BotNames then
 		end
 
 		local function fetch_members()
-			dohttpreq(url, function (data, _, request_info)
+			dohttpreq(url, function(data, _, request_info)
 				if not request_info.querySucceeded then
 					return
 				end
@@ -77,7 +81,7 @@ if not BotNames then
 		for _, v in pairs(Steam:friends()) do
 			table.insert(friends, v:name())
 		end
-		local num_names = math.min(BigLobbyGlobals and BigLobbyGlobals.num_bot_slots and BigLobbyGlobals:num_bot_slots() or tweak_data.max_players - 1, #friends)
+		local num_names = math.min(BotNames:get_num_bots(), #friends)
 		for _ = 1, num_names do
 			local index = math.random(#friends)
 			local friend = friends[index]
@@ -85,7 +89,7 @@ if not BotNames then
 			table.insert(self.names, friend)
 		end
 		if Network:is_server() then
-			DelayedCalls:Add("send_bot_names", 2, function ()
+			DelayedCalls:Add("send_bot_names", 2, function()
 				LuaNetworking:SendToPeers("bot_names", json.encode(self.names))
 			end)
 		end
@@ -107,7 +111,7 @@ if not BotNames then
 		return name
 	end
 
-	Hooks:Add("LocalizationManagerPostInit", "LocalizationManagerPostInitBotNames", function (loc)
+	Hooks:Add("LocalizationManagerPostInit", "LocalizationManagerPostInitBotNames", function(loc)
 		HopLib:load_localization(BotNames.mod_path .. "loc/", loc)
 	end)
 
@@ -135,11 +139,9 @@ if RequiredScript == "lib/units/player_team/teamaibase" then
 		return BotNames.nick_names[self._tweak_table]
 	end
 
-end
+elseif RequiredScript == "lib/network/base/basenetworksession" then
 
-if RequiredScript == "lib/network/base/basenetworksession" then
-
-	Hooks:PreHook(BaseNetworkSession, "_on_peer_removed", "_on_peer_removed_bot_names", function (self, peer)
+	Hooks:PreHook(BaseNetworkSession, "_on_peer_removed", "_on_peer_removed_bot_names", function(self, peer)
 		if peer:character() then
 			BotNames.nick_names[peer:character()] = peer:name()
 		end
